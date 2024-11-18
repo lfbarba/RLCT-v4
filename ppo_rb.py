@@ -102,7 +102,7 @@ class PPO_RB():
         self.long_time=max_length
         self.max_length=max_length
         self.save_path=save_path
-        img_path='../ct_data'
+        img_path='ct_data/lamino_images.npy'
         self.env=CT(img_path,have_noise=True)
         self.runningstat=RunningStat(())
         stat_fp=open('./obs_stat.txt','rb')
@@ -126,7 +126,8 @@ class PPO_RB():
             self.critic_scheduler=optim.lr_scheduler.StepLR(self.critic_optimizer,80,self.args.lr_decay_rate)
             #self.actor_scheduler=optim.lr_scheduler.CosineAnnealingLR(self.actor_optimizer,200,1e-5)
             #self.critic_scheduler=optim.lr_scheduler.CosineAnnealingLR(self.critic_optimizer,200,1e-4)
-
+        if load_path != '':
+            self.load(load_path)
     
 
     def multi_train(self,all_ep):
@@ -152,7 +153,7 @@ class PPO_RB():
             for i in range(self.train_ep):
                 self.train(min(len(self.replay_buffer.buffer),self.batch))
             self.replay_buffer.clear()
-            if ep%10==9:
+            if ep%10==1:
                 avg_len=int(np.mean(np.array(avg_timelen)))
                 self.test_train(avg_len)
                 #print(self.avg_H)
@@ -466,7 +467,7 @@ class PPO_RB():
         old_act=np.zeros((self.action_dim,))
         equal=1.0/time_len
         self.start_epoch(1)
-        angles=list(range(360))
+        angles=list(range(180))
         random.shuffle(angles)
         for i in range(time_len):
             if i!=0:

@@ -11,7 +11,7 @@ def main():
     if args.RL_alg=='PPO':
         agent=ppo.PPO(args,800,180,(256,64),(3,2),args.actor_lr,args.critic_lr,args.gamma,save_path=args.save_path,load_path='')
     elif args.RL_alg=='PPO-RB':
-        agent=ppo_rb.PPO_RB(args,800,360,(256,64),(3,2),args.actor_lr,args.critic_lr,args.gamma,save_path=args.save_path,load_path='')
+        agent=ppo_rb.PPO_RB(args,512,180,(256,64),(3,2),args.actor_lr,args.critic_lr,args.gamma,save_path=args.save_path,load_path=args.load_path)
     elif args.RL_alg=='SPG':
         agent=spg.SPG(args,512,180,(256,64),(3,2),args.actor_lr,args.critic_lr,args.gamma,save_path=args.save_path,load_path='')
     elif args.RL_alg=='DDPG':

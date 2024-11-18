@@ -100,7 +100,7 @@ class PPO():
         self.long_time=max_length
         self.max_length=max_length
         self.save_path=save_path
-        img_path='../ct_data'
+        img_path='ct_data/DICOM'
         self.env=CT(img_path,have_noise=True)
         self.runningstat=RunningStat(())
         stat_fp=open('./obs_stat.txt','rb')

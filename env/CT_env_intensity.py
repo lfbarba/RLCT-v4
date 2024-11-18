@@ -9,8 +9,8 @@ import torch
 from utils import torch_W, torch_Wt,torch_Weighted_Wt
 #from jsr_model_utils import load_data_list, radon_op_new, get_tr_item, norm_l2, ThreshCoeff,PDalg_Model,myAtA
 from reconstruct_alg import Wavelet_Model,TVAtA,TV_model,myAtA
-from odl.contrib import torch as odl_torch
-import odl
+# from odl.contrib import torch as odl_torch
+# import odl
 from skimage.metrics import structural_similarity as ssim
 
 def read_img(img_path):
@@ -26,6 +26,8 @@ def read_img(img_path):
                 tmp_img=tmp_img.pixel_array#[0::2,0::2]
                 img_list.append(tmp_img)
     img_data=np.array(img_list)
+    img_data = np.load(img_path) * 255
+    print("img_data", img_data.shape)
     print('done')
     return img_data
 
@@ -34,8 +36,8 @@ def error_eval(u_pre,u_true):
     return e1
 
 def psnr(u_pre,u_true):
-    norm_pre=u_pre/np.max(u_pre)*255
-    norm_true=u_true/np.max(u_true)*255
+    norm_pre=u_pre/255
+    norm_true=u_true/255
     mse=np.mean((norm_pre-norm_true)**2)
     if mse==0:
         return 100
@@ -43,24 +45,25 @@ def psnr(u_pre,u_true):
     return 20 * math.log10(PIXEL_MAX / math.sqrt(mse))
 
 def psnr2(u_pre,u_true):
-    mse=np.mean((u_pre-u_true)**2)
+    norm_pre = u_pre / 255
+    norm_true = u_true / 255
+    mse=np.mean((norm_pre-norm_true)**2)
     if mse==0:
         return 100
-    PIXEL_MAX = 4096
-    return 20 * math.log10(PIXEL_MAX / math.sqrt(mse))
+    PIXEL_MAX = 1
+    return 10 * math.log10(PIXEL_MAX**2 / mse)
 def printlog(str1):
     fp=open('./test.out','a')
     fp.write(str1)
     fp.close()
 
 def astra_alg(u0,proj_u,angle,jsr_use=False,alg='SART',iters=100):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "mps")
     s1,s2=u0.shape
-    detector=800
     proj_u_array=np.array(proj_u)
     angle_array=np.array(angle)*np.pi/180.0
-    vol_gem=astra.creators.create_vol_geom(s1,s2,-200,200,-200,200)
-    proj_gem=astra.creators.create_proj_geom('fanflat',1.2,detector,angle_array,600,290)
+    vol_gem=astra.creators.create_vol_geom((s1,s2))
+    proj_gem=astra.creators.create_proj_geom('parallel',1,s1,angle_array)
     if torch.cuda.is_available():
         proj_id=astra.creators.create_projector('cuda',proj_gem,vol_gem)
     else:
@@ -117,15 +120,14 @@ class CT():
     def __init__(self,img_path,have_noise=False,each_iter=50,CT_reconstruct_alg='SART'):
         self.img_data=read_img(img_path)
         self.img_data_size=self.img_data.shape[0]
-        self.action_num=360
-        self.stop_action=-1
+        self.action_num=180+1
+        self.stop_action=180
         self.each_iter=each_iter
         self.has_noise=have_noise
         self.max_photon=1.4*180/1e5
         self.scale=100000
         self.proj_data=0
         self.rest=1.0
-        self.detector=800
         if type(CT_reconstruct_alg)==type('string'):
             self.alg=CT_reconstruct_alg
             self.reconstruct_alg=astra_alg
@@ -143,9 +145,9 @@ class CT():
         if set_pic is not None:
             self.true_img=set_pic
         #self.true_img=self.img_data[10]
-        init_act=random.randint(0,self.action_num)
+        init_act=random.randint(0,179)
         s1,s2=self.true_img.shape
-        proj_data=np.zeros((self.detector,))
+        proj_data=np.zeros((s1,))
         img_size=self.true_img.shape
         self.state=np.zeros(img_size)
         #self.rest=1.+random.random()*0.2-0.1
@@ -230,9 +232,8 @@ class CT():
 
     def get_project_data(self,img,action,doze,noise=False):
         s1,s2=img.shape
-        detector=800
-        vol_gem=astra.creators.create_vol_geom(s1,s2,-200,200,-200,200)
-        proj_gem=astra.creators.create_proj_geom('fanflat',1.2,detector,action*np.pi/180.0,600,290)
+        vol_gem=astra.creators.create_vol_geom((s1,s2))
+        proj_gem=astra.creators.create_proj_geom('parallel',1,s1,action*np.pi/180.0)
         if torch.cuda.is_available():
             proj_id=astra.creators.create_projector('cuda',proj_gem,vol_gem)
         else:
@@ -252,11 +253,10 @@ class CT():
         if noise:
             mean_p=np.mean(img_sino_data)/1.0e5
             nosie_intensity=1/(math.sqrt(self.max_photon*doze*math.exp(-mean_p)))*5
-            img_sino_data+=np.random.randn(1,detector)*nosie_intensity
+            img_sino_data+=np.random.randn(1,s1)*nosie_intensity
             img_sino_data=np.clip(img_sino_data,0,None)
         astra.clear()
-        #print(img_sino_data.shape)
-        return img_sino_data.reshape((detector,)).copy()
+        return img_sino_data.reshape((s1,)).copy()
 
     def show_psnr(self):
         return psnr2(self.state,self.true_img)
