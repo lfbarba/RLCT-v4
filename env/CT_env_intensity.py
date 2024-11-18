@@ -58,7 +58,8 @@ def printlog(str1):
     fp.close()
 
 def astra_alg(u0,proj_u,angle,jsr_use=False,alg='SART',iters=100):
-    device = torch.device("cuda" if torch.cuda.is_available() else "mps")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("device", device)
     s1,s2=u0.shape
     proj_u_array=np.array(proj_u)
     angle_array=np.array(angle)*np.pi/180.0
