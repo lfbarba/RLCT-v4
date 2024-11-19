@@ -21,7 +21,7 @@ def main():
     if args.load_path is not None:
         agent.load(args.load_path)
 
-    agent.multi_train(100000)
+    agent.single_train(100000)
 
 if __name__ == "__main__":
     mp.set_start_method('spawn')

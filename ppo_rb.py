@@ -169,6 +169,52 @@ class PPO_RB():
             pools.close()
             pools.join()
 
+    def single_train(self, all_ep):
+        avg_rew = []
+        avg_repeat = []
+        avg_timelen = []
+
+        for ep in range(all_ep):
+            res = []
+
+            # Run the environment in a single process
+            for i in range(12):
+                history, info = run_env(self, ep)  # Direct call without multiprocessing
+                res.append((history, info))
+
+            # Process results
+            for history, info in res:
+                history = self.gae(history, 0.96)
+                avg_rew.append(info[0])
+                print(
+                    f"epoch {ep}:reward {info[0]},noise level:{info[4]},time length {info[3]},non-discount:{info[1]},scale reward:{info[2]},repeat:{info[5]},psnr:{info[6]}")
+                avg_timelen.append(info[3])
+                self.replay_buffer.insert(history)
+
+            torch.cuda.empty_cache()
+
+            # Training loop
+            for i in range(self.train_ep):
+                self.train(min(len(self.replay_buffer.buffer), self.batch))
+
+            # Clear replay buffer after training
+            self.replay_buffer.clear()
+
+            # Periodic testing and saving
+            if ep % 10 == 1:
+                avg_len = int(np.mean(np.array(avg_timelen)))
+                self.test_train(avg_len)
+                print(f"avg entropy:{np.mean(np.array(self.avg_H))}")
+                print(f"avg time-len:{avg_len}")
+                avg_timelen = []
+                self.avg_H = []
+                print(f"avg reward:{np.mean(np.array(avg_rew))}")
+                print(
+                    f"learning rate:actor:{self.actor_optimizer.param_groups[0]['lr']},critic:{self.critic_optimizer.param_groups[0]['lr']}")
+                self.save(self.save_path, ep)
+                avg_rew = []
+                avg_repeat = []
+
     def start_epoch(self,batch_size):
         start_a_hidden=self.policy_net.init_hidden(batch_size)
         start_v_hidden=self.critic_net.init_hidden(batch_size)
